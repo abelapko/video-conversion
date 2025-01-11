@@ -2,7 +2,8 @@
     "name": "root/app",
     "autoload": {
         "psr-4": {
-            "Root\\App\\": "src/"
+            "App\\": "src/",
+            "App\\Tests\\": "tests/"
         }
     },
     "authors": [
@@ -17,5 +18,9 @@
         "php-amqplib/php-amqplib": "v3.7.2",
         "php": "^8",
         "aws/aws-sdk-php": "^3.336"
+    },
+    "require-dev": {
+        "mockery/mockery": "^1.6",
+        "phpunit/phpunit": "^11.5"
     }
 }
