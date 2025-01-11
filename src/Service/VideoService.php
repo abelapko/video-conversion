@@ -39,7 +39,7 @@ class VideoService
             $this->cloudStorageService->uploadFile($convertedFilePath, 'converted/' . pathinfo($uploadedFilePath, PATHINFO_FILENAME) . '.avi');
 
             // Возвращаем URL конвертированного файла
-            return 'https://' . $this->cloudStorageService->getBucket() . '.storage.yandexcloud.net/converted/' . pathinfo($uploadedFilePath, PATHINFO_FILENAME) . '.avi';
+            return 'https://storage.yandexcloud.net/converted/' . pathinfo($uploadedFilePath, PATHINFO_FILENAME) . '.avi';
 
         } catch (\Exception $e) {
             throw new \RuntimeException('Error processing video: ' . $e->getMessage());
