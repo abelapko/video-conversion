@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
   cli:
-    image: composer:latest
+    build: .
     volumes:
       - .:/app
     working_dir: /app
