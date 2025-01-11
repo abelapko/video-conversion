@@ -3,73 +3,38 @@
 namespace App\Controller;
 
 use App\Service\VideoService;
-use Psr\Http\Message\RequestInterface;
 use Psr\Http\Message\ResponseInterface;
-use Slim\Psr7\Factory\StreamFactory;
+use Psr\Http\Message\ServerRequestInterface;
 
 class VideoController
 {
     private $videoService;
 
+    // Конструктор для получения зависимости VideoService через DI
     public function __construct(VideoService $videoService)
     {
         $this->videoService = $videoService;
     }
 
-    // Маршрут для загрузки видео
-    public function uploadVideo(RequestInterface $request, ResponseInterface $response): ResponseInterface
+    // Метод для обработки загрузки видео
+    public function uploadVideo(ServerRequestInterface $request, ResponseInterface $response)
     {
         $uploadedFiles = $request->getUploadedFiles();
-
-        // Проверяем, был ли загружен файл
         if (empty($uploadedFiles['video'])) {
-            $response->getBody()->write(json_encode(['message' => 'No video file uploaded.']));
-            return $response->withStatus(400)->withHeader('Content-Type', 'application/json');
+            $response->getBody()->write("No video uploaded.");
+            return $response->withStatus(400);
         }
 
-        $videoFile = $uploadedFiles['video'];
-
-        // Проверяем тип файла
-        if ($videoFile->getClientMediaType() !== 'video/mp4') {
-            $response->getBody()->write(json_encode(['message' => 'File is not a valid MP4 video.']));
-            return $response->withStatus(400)->withHeader('Content-Type', 'application/json');
-        }
-
-        // Получаем путь для сохранения видео
-        $uploadPath = '/tmp/uploads/';
-        $videoPath = $uploadPath . $videoFile->getClientFilename();
-
-        // Сохраняем файл на сервере
-        $videoFile->moveTo($videoPath);
+        $uploadedFile = $uploadedFiles['video'];
 
         try {
-            // Обрабатываем видео (конвертируем и загружаем в облако)
-            $this->videoService->processVideo($videoFile);
-
-            // Возвращаем успешный ответ
-            $response->getBody()->write(json_encode(['message' => 'Video uploaded, converted and uploaded to cloud successfully.']));
-            return $response->withStatus(200)->withHeader('Content-Type', 'application/json');
-        } catch (\Exception $e) {
-            $response->getBody()->write(json_encode(['message' => 'Error: ' . $e->getMessage()]));
-            return $response->withStatus(500)->withHeader('Content-Type', 'application/json');
+            // Обрабатываем видео (загружаем и конвертируем)
+            $videoUrl = $this->videoService->processVideo($uploadedFile);
+            $response->getBody()->write("Video uploaded and converted successfully: " . $videoUrl);
+            return $response->withStatus(200);
+        } catch (\RuntimeException $e) {
+            $response->getBody()->write("Error processing video: " . $e->getMessage());
+            return $response->withStatus(500);
         }
-    }
-
-    // Маршрут для получения видео
-    public function getVideo(RequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
-    {
-        $fileName = $args['fileName'];
-        $filePath = '/tmp/uploads/' . $fileName;
-
-        if (!file_exists($filePath)) {
-            $response->getBody()->write(json_encode(['message' => 'File not found.']));
-            return $response->withStatus(404)->withHeader('Content-Type', 'application/json');
-        }
-
-        $stream = (new StreamFactory())->createStreamFromFile($filePath);
-
-        return $response->withHeader('Content-Type', 'video/mp4')
-            ->withHeader('Content-Disposition', 'attachment; filename="' . $fileName . '"')
-            ->withBody($stream);
     }
 }
