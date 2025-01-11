@@ -15,6 +15,7 @@
         "slim/psr7": "^1.7",
         "php-di/php-di": "^7.0",
         "php-amqplib/php-amqplib": "v3.7.2",
-        "php": "^8"
+        "php": "^8",
+        "aws/aws-sdk-php": "^3.336"
     }
 }
