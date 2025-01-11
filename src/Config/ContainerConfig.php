@@ -2,35 +2,34 @@
 
 namespace App\Config;
 
-use Psr\Container\ContainerInterface;
-use Slim\Container;
+use DI\Container;
 use App\Cloud\YandexCloudStorageService;
 use App\Service\VideoService;
 use App\Converter\VideoConverter;
 
 class ContainerConfig
 {
-    public static function configure(ContainerInterface $container)
+    public static function configure(Container $container)
     {
         // Получаем конфигурацию
         $config = require __DIR__ . '/../Config/parameters.php';
 
         // Регистрация сервисов в контейнере
-        $container[VideoConverter::class] = function () {
+        $container->set(VideoConverter::class, function () {
             return new VideoConverter();
-        };
+        });
 
-        $container[YandexCloudStorageService::class] = function () use ($config) {
+        $container->set(YandexCloudStorageService::class, function () use ($config) {
             return new YandexCloudStorageService($config['yandex']);
-        };
+        });
 
-        $container[VideoService::class] = function () use ($container, $config) {
+        $container->set(VideoService::class, function () use ($container, $config) {
             return new VideoService(
                 $container->get(YandexCloudStorageService::class),
                 $container->get(VideoConverter::class),
                 $config['upload_path'],
                 $config['convert_path']
             );
-        };
+        });
     }
 }

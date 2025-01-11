@@ -10,16 +10,18 @@ class App
 {
     public static function run()
     {
+        static::create()->run();
+    }
+
+    public static function create(): \Slim\App
+    {
         // Настройка DI контейнера через отдельный конфигурационный файл
         $containerBuilder = new ContainerBuilder();
-        ContainerConfig::configure($containerBuilder); // Вызываем конфигурацию
         $container = $containerBuilder->build();
+        ContainerConfig::configure($container); // Вызываем конфигурацию
 
         // Создание приложения Slim
         AppFactory::setContainer($container);
-        $app = AppFactory::create();
-
-        // Запуск приложения
-        $app->run();
+        return AppFactory::create();
     }
 }
