@@ -9,5 +9,8 @@ class RouteConfig
 {
     public static function configure(App $app)
     {
+        // Настройка маршрутов
+        $app->post('/upload', [VideoController::class, 'uploadVideo']);
+        // Добавьте другие маршруты здесь
     }
 }
