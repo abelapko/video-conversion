@@ -22,6 +22,7 @@ class YandexCloudStorageService
                 'secret' => $config['secret_key'],  // Ваш secret key
             ],
             'signature' => 'v4', // Яндекс поддерживает v4 подпись
+            'use_path_style_endpoint' => true, // Для правильной работы с LocalStack
         ]);
 
         $this->bucket = $config['bucket'];  // Название вашего бакета
