@@ -3,6 +3,7 @@
 namespace App\Config;
 
 use App\Repository\RabbitMQRepository;
+use App\Worker\VideoConversionWorker;
 use DI\Container;
 use App\Cloud\YandexCloudStorageService;
 use App\Service\VideoService;
@@ -65,6 +66,17 @@ class ContainerConfig
                 $container->get(YandexCloudStorageService::class),
                 $container->get(VideoConverter::class),
                 $config['upload_path'],
+                $config['convert_path'],
+                $container->get(LoggerInterface::class)
+            );
+        });
+
+        // Регистрация VideoConversionWorker
+        $container->set(VideoConversionWorker::class, function ($container, $config) {
+            return new VideoConversionWorker(
+                $container->get(RabbitMQRepository::class),
+                $container->get(VideoConverter::class),
+                $container->get(YandexCloudStorageService::class),
                 $config['convert_path'],
                 $container->get(LoggerInterface::class)
             );
