@@ -1,12 +1,10 @@
 <?php
 
-return [
-    'yandex' => [
-        'endpoint' => 'https://storage.yandexcloud.net',
-        'access_key' => 'your-access-key',
-        'secret_key' => 'your-secret-key',
-        'bucket' => 'your-bucket-name',
-    ],
-    'upload_path' => '/path/to/upload/directory',
-    'convert_path' => '/path/to/convert/directory',
-];
+$env = getenv('APP_ENV') ?: 'dev'; // По умолчанию окружение — dev
+$parametersFile = __DIR__ . "/parameters.{$env}.php";
+
+if (!file_exists($parametersFile)) {
+    throw new \RuntimeException("Configuration file for environment '{$env}' not found.");
+}
+
+return require $parametersFile;
