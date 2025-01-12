@@ -17,7 +17,8 @@
         "php-di/php-di": "^7.0",
         "php-amqplib/php-amqplib": "v3.7.2",
         "php": "^8",
-        "aws/aws-sdk-php": "^3.336"
+        "aws/aws-sdk-php": "^3.336",
+        "monolog/monolog": "^3.8"
     },
     "require-dev": {
         "mockery/mockery": "^1.6",
