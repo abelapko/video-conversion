@@ -11,6 +11,11 @@ class RouteConfig
     {
         // Настройка маршрутов
         $app->post('/upload', [VideoController::class, 'uploadVideo']);
-        // Добавьте другие маршруты здесь
+
+        // Добавляем роут для проверки статуса задачи
+        $app->get('/task/{taskId}/status', [VideoController::class, 'checkTaskStatus']);
+
+        // Роут для скачивания сконвертированного видео
+        $app->get('/download/{taskId}', [VideoController::class, 'downloadVideo']);
     }
 }

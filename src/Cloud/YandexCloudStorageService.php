@@ -28,13 +28,8 @@ class YandexCloudStorageService
         $this->bucket = $config['bucket'];  // Название вашего бакета
     }
 
-    public function getBucket(): string
-    {
-        return $this->bucket;
-    }
-
     // Метод для загрузки файла в Яндекс Object Storage
-    public function uploadFile($filePath, $objectKey)
+    public function uploadFile($filePath, $objectKey): string
     {
         try {
             $this->s3Client->putObject([
@@ -44,23 +39,36 @@ class YandexCloudStorageService
                 'ACL'    => 'public-read',  // Публичный доступ (если нужно)
             ]);
             echo "File uploaded successfully to Yandex Cloud\n";
+            return $this->getFileUrl($objectKey);
         } catch (AwsException $e) {
             echo "Error uploading file: " . $e->getMessage() . "\n";
         }
     }
 
     // Метод для скачивания файла из Yandex Object Storage
-    public function downloadFile($objectKey, $destinationPath)
+    public function downloadFile($objectKey)
     {
         try {
             $result = $this->s3Client->getObject([
                 'Bucket' => $this->bucket,
                 'Key'    => $objectKey,
-                'SaveAs' => $destinationPath,
             ]);
-            echo "File downloaded successfully from Yandex Cloud\n";
+            return $result['Body'];  // Возвращаем содержимое файла
         } catch (AwsException $e) {
             echo "Error downloading file: " . $e->getMessage() . "\n";
+            return null;
+        }
+    }
+
+    // Метод для получения публичной ссылки на файл из Яндекс Object Storage
+    public function getFileUrl($objectKey)
+    {
+        try {
+            $url = $this->s3Client->getObjectUrl($this->bucket, $objectKey);
+            return $url;  // Возвращаем ссылку на файл
+        } catch (AwsException $e) {
+            echo "Error getting file URL: " . $e->getMessage() . "\n";
+            return null;  // Возвращаем null в случае ошибки
         }
     }
 }

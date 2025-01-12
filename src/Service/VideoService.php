@@ -3,39 +3,41 @@
 namespace App\Service;
 
 use App\Cloud\YandexCloudStorageService;
-use App\Converter\VideoConverter;
+use App\Repository\RabbitMQRepository;
+use App\Repository\RedisRepository;
 use Psr\Http\Message\UploadedFileInterface;
 use Psr\Log\LoggerInterface;
+use Ramsey\Uuid\Uuid;
 
 class VideoService
 {
     private $cloudStorageService;
-    private $videoConverter;
+    private $rabbitMQRepository;
+    private $redisRepository;
     private $uploadPath;
-    private $convertPath;
     private $logger;
 
     public function __construct(
         YandexCloudStorageService $cloudStorageService,
-        VideoConverter $videoConverter,
-                                  $uploadPath,
-                                  $convertPath,
+        RabbitMQRepository $rabbitMQRepository,
+        RedisRepository $redisRepository,
+        string $uploadPath,
         LoggerInterface $logger
     ) {
         $this->cloudStorageService = $cloudStorageService;
-        $this->videoConverter = $videoConverter;
+        $this->rabbitMQRepository = $rabbitMQRepository;
+        $this->redisRepository = $redisRepository;
         $this->uploadPath = $uploadPath;
-        $this->convertPath = $convertPath;
         $this->logger = $logger;
     }
 
-    public function processVideo(UploadedFileInterface $file)
+    public function processVideo(UploadedFileInterface $file): string
     {
         $uploadedFilePath = $this->uploadPath . DIRECTORY_SEPARATOR . $file->getClientFilename();
-        $this->logger->info('Starting video processing', ['file' => $file->getClientFilename()]);
+        $this->logger->info('Starting video upload process', ['file' => $file->getClientFilename()]);
 
-        // Сохраняем файл в временную папку
         try {
+            // Сохраняем файл в локальное хранилище
             $file->moveTo($uploadedFilePath);
             $this->logger->info('File moved to upload path', ['path' => $uploadedFilePath]);
         } catch (\Exception $e) {
@@ -44,31 +46,48 @@ class VideoService
         }
 
         try {
-            // Загружаем исходное видео в Яндекс Object Storage
-            $this->logger->info('Uploading original video to cloud storage');
-            $this->cloudStorageService->uploadFile($uploadedFilePath, 'videos/' . $file->getClientFilename());
+            // Загружаем файл в облако
+            $this->logger->info('Uploading video to cloud storage');
+            $cloudUrl = $this->cloudStorageService->uploadFile($uploadedFilePath, $file->getClientFilename());
 
-            // Конвертируем видео
-            $convertedFilePath = $this->convertPath . DIRECTORY_SEPARATOR . pathinfo($uploadedFilePath, PATHINFO_FILENAME) . '.avi';
-            $this->logger->info('Converting video', [
-                'input' => $uploadedFilePath,
-                'output' => $convertedFilePath,
+            // Генерация уникального идентификатора задачи
+            $taskId = Uuid::uuid4()->toString();
+
+            // Сохраняем статус задачи в Redis как "in_progress"
+            $this->redisRepository->setTaskStatus($taskId, 'in_progress');
+
+            // Постановка задачи на конвертацию в очередь
+            $this->logger->info('Publishing task to conversion queue', ['taskId' => $taskId]);
+            $this->rabbitMQRepository->sendToQueue([
+                'taskId' => $taskId,
+                'sourceUrl' => $cloudUrl,
+                'format' => 'avi',
             ]);
-            $this->videoConverter->convert($uploadedFilePath, $convertedFilePath);
 
-            // Загружаем конвертированное видео в Яндекс Object Storage
-            $this->logger->info('Uploading converted video to cloud storage');
-            $this->cloudStorageService->uploadFile($convertedFilePath, 'converted/' . pathinfo($uploadedFilePath, PATHINFO_FILENAME) . '.avi');
+            $this->logger->info('Task published successfully', ['taskId' => $taskId]);
 
-            // Возвращаем URL конвертированного файла
-            $url = 'https://storage.yandexcloud.net/converted/' . pathinfo($uploadedFilePath, PATHINFO_FILENAME) . '.avi';
-            $this->logger->info('Video processing completed successfully', ['url' => $url]);
-
-            return $url;
-
+            return $taskId;
         } catch (\Exception $e) {
-            $this->logger->error('Error during video processing', ['error' => $e->getMessage()]);
+            $this->logger->error('Error processing video', ['error' => $e->getMessage()]);
             throw new \RuntimeException('Error processing video: ' . $e->getMessage());
         }
+    }
+
+    public function updateTaskStatus(string $taskId, string $status)
+    {
+        // Обновляем статус задачи в Redis
+        $this->redisRepository->setTaskStatus($taskId, $status);
+    }
+
+    /**
+     * Получить статус задачи из Redis.
+     *
+     * @param string $taskId Уникальный идентификатор задачи.
+     * @return string|null Статус задачи или null, если задача не найдена.
+     */
+    public function getTaskStatus(string $taskId): ?string
+    {
+        // Запрашиваем статус задачи из Redis
+        return $this->redisRepository->getTaskStatus($taskId);
     }
 }
