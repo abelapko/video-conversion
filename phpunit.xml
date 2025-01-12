@@ -1,13 +1,23 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <phpunit
-    bootstrap="vendor/autoload.php"
-    colors="true"
-    stopOnFailure="false"
-    verbose="true"
+        bootstrap="tests/bootstrap.php"
+        colors="true"
+        stopOnFailure="false"
+        verbose="true"
 >
     <testsuites>
         <testsuite name="Application Test Suite">
             <directory>tests/</directory>
         </testsuite>
     </testsuites>
+    <logging>
+        <!-- Логирование в формате JUnit -->
+        <log type="junit" target="tests/logs/junit.xml"/>
+
+        <!-- Текстовый лог TestDox -->
+        <log type="testdox-text" target="tests/logs/testdox.txt"/>
+
+        <!-- Логирование с выводом в консоль -->
+        <log type="testdox-html" target="tests/logs/testdox.html"/>
+    </logging>
 </phpunit>

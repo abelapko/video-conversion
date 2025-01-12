@@ -22,6 +22,7 @@
     },
     "require-dev": {
         "mockery/mockery": "^1.6",
-        "phpunit/phpunit": "^11.5"
+        "phpunit/phpunit": "^11.5",
+        "mikey179/vfsstream": "^1.6"
     }
 }

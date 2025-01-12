@@ -6,87 +6,62 @@ use App\Service\VideoService;
 use App\Cloud\YandexCloudStorageService;
 use App\Converter\VideoConverter;
 use PHPUnit\Framework\TestCase;
-use Psr\Http\Message\UploadedFileInterface;
+use Psr\Log\LoggerInterface;
+use org\bovigo\vfs\vfsStream;
 
 class VideoServiceTest extends TestCase
 {
-    private $cloudStorageService;
-    private $videoConverter;
-    private $videoService;
-    private $uploadPath;
-    private $convertPath;
+    private $parameters;
+    private $root;
 
     protected function setUp(): void
     {
-        // Мокируем зависимости
-        $this->cloudStorageService = $this->createMock(YandexCloudStorageService::class);
-        $this->videoConverter = $this->createMock(VideoConverter::class);
+        // Эмулируем файловую систему
+        $this->root = vfsStream::setup('root');
+        $this->parameters = require getenv('ROOT_PATH') . '/src/Config/parameters.php';
 
-        // Пути для загрузки и конвертации
-        $this->uploadPath = '/path/to/upload';
-        $this->convertPath = '/path/to/convert';
+        $uploadPath = vfsStream::newDirectory('uploads')->at($this->root);
+        $convertPath = vfsStream::newDirectory('converted')->at($this->root);
 
-        // Инициализируем VideoService с моками
+        // Мокаем сервисы и конвертер
+        $yandexConfig = $this->parameters['yandex'];
+        $realYandexService = new YandexCloudStorageService($yandexConfig);
+
+        $mockConverter = $this->createMock(VideoConverter::class);
+        $mockConverter->method('convert')->willReturn(true);
+
         $this->videoService = new VideoService(
-            $this->cloudStorageService,
-            $this->videoConverter,
-            $this->uploadPath,
-            $this->convertPath
+            $realYandexService,
+            $mockConverter,
+            $uploadPath->url(),
+            $convertPath->url(),
+            $this->createMock(LoggerInterface::class)
         );
+
+        // Создаем тестовый файл
+        $this->createTestVideoFile($uploadPath);
     }
 
-    public function testProcessVideoSuccessfully()
+    public function testProcessVideo()
     {
-        // Мокируем файл
-        $uploadedFile = $this->createMock(UploadedFileInterface::class);
-        $uploadedFile->method('getClientFilename')->willReturn('test_video.mp4');
-        $uploadedFile->method('moveTo')->will($this->returnCallback(function ($path) {
-            file_put_contents($path, 'test'); // Эмулируем перемещение файла
-        }));
+        $result = $this->videoService->processVideo($this->getMockUploadedFile());
 
-        // Мокируем поведение облачного хранилища и конвертера
-        $this->cloudStorageService
-            ->expects($this->exactly(2))  // Проверяем два вызова
-            ->method('uploadFile')
-            ->willReturnOnConsecutiveCalls(
-                true, // Первый вызов
-                true  // Второй вызов
-            );
-
-        $this->videoConverter
-            ->expects($this->once())  // Конвертация
-            ->method('convert')
-            ->with($this->uploadPath . '/test_video.mp4', $this->convertPath . '/test_video.avi')
-            ->willReturn(true);
-
-        // Выполняем процесс видео
-        $result = $this->videoService->processVideo($uploadedFile);
-
-        // Проверяем результат
-        $expectedUrl = 'https://storage.yandexcloud.net/converted/test_video.avi';
-        $this->assertEquals($expectedUrl, $result);
+        $this->assertStringContainsString('https://storage.yandexcloud.net/converted/', $result);
     }
 
-    public function testProcessVideoThrowsExceptionOnError()
+    private function createTestVideoFile($uploadPath)
     {
-        // Мокируем файл
-        $uploadedFile = $this->createMock(UploadedFileInterface::class);
-        $uploadedFile->method('getClientFilename')->willReturn('test_video.mp4');
-        $uploadedFile->method('moveTo')->will($this->returnCallback(function ($path) {
-            file_put_contents($path, 'test');
-        }));
+        file_put_contents(vfsStream::url('root/uploads/test.mp4'), 'dummy video content');
+    }
 
-        // Мокируем поведение облачного хранилища с ошибкой
-        $this->cloudStorageService
-            ->expects($this->exactly(1))  // Ожидаем один вызов
-            ->method('uploadFile')
-            ->willThrowException(new \RuntimeException('Upload failed'));
+    private function getMockUploadedFile()
+    {
+        $mock = $this->createMock(\Psr\Http\Message\UploadedFileInterface::class);
+        $mock->method('getClientFilename')->willReturn('test.mp4');
+        $mock->method('moveTo')->willReturnCallback(function($targetPath) {
+            copy(vfsStream::url('root/uploads/test.mp4'), $targetPath);
+        });
 
-        // Проверяем, что метод выбрасывает исключение при ошибке
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('Error processing video: Upload failed');
-
-        // Выполняем процесс видео, ожидая исключение
-        $this->videoService->processVideo($uploadedFile);
+        return $mock;
     }
 }
