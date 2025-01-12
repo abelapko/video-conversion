@@ -2,7 +2,30 @@ version: '3.8'
 
 services:
   cli:
+    # CLI контейнер для взаимодействия с приложением
     build: .
     volumes:
       - .:/app
     working_dir: /app
+    depends_on:
+      - localstack
+    networks:
+      - localstack_network  # Указываем, что cli должен быть в общей сети с localstack
+
+  localstack:
+    image: localstack/localstack
+    environment:
+      - SERVICES=s3,sqs,iam,cloudwatch  # Указываем нужные сервисы AWS
+      - DEFAULT_REGION=us-east-1
+      - DOCKER_HOST=unix:///var/run/docker.sock  # Путь к Docker сокету
+    ports:
+      - "4566:4566"  # Порт для основного API LocalStack
+      - "4510-4559:4510-4559"  # Дополнительные порты для сервисов
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock"  # Монтируем Docker сокет
+    networks:
+      - localstack_network  # Указываем, что localstack должен быть в общей сети с cli
+
+networks:
+  localstack_network:
+    driver: bridge  # Используем стандартный драйвер сети "bridge"
