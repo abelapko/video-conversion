@@ -2,12 +2,14 @@
 
 namespace App\Config;
 
+use App\Repository\RabbitMQRepository;
 use DI\Container;
 use App\Cloud\YandexCloudStorageService;
 use App\Service\VideoService;
 use App\Converter\VideoConverter;
 use Monolog\Logger;
 use Monolog\Handler\StreamHandler;
+use PhpAmqpLib\Connection\AMQPStreamConnection;
 use Psr\Log\LoggerInterface;
 
 class ContainerConfig
@@ -16,6 +18,21 @@ class ContainerConfig
     {
         // Получаем конфигурацию
         $config = require __DIR__ . '/../Config/parameters.php';
+
+        // Регистрируем AMQPStreamConnection в контейнере
+        $container->set(AMQPStreamConnection::class, function () use ($config) {
+            return new AMQPStreamConnection(
+                getenv('RABBITMQ_HOST'),
+                getenv('RABBITMQ_PORT'),
+                getenv('RABBITMQ_USER'),
+                getenv('RABBITMQ_PASSWORD')
+            );
+        });
+
+        // Регистрируем RabbitMQRepository с зависимостью от AMQPStreamConnection
+        $container->set(RabbitMQRepository::class, function ($container) {
+            return new RabbitMQRepository($container->get(AMQPStreamConnection::class));
+        });
 
         // Регистрация сервисов в контейнере
         $container->set(VideoConverter::class, function () {
